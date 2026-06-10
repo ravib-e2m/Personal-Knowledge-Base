@@ -1,19 +1,22 @@
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const groqApiKey = process.env.GROQ_API_KEY || '';
-const EMBEDDING_MODEL = 'text-embedding-004';
+// Use Gemini's text-embedding-004 model with 768 dimensions
+const EMBEDDING_MODEL = 'text-embedding-004'; // Gemini model
 const EMBEDDING_DIMENSIONS = 768;
 
-if (!geminiApiKey) {
-  console.warn('Warning: GEMINI_API_KEY is not set. Embedding generation will fail.');
+if (!openaiApiKey && !geminiApiKey) {
+  console.warn('Warning: Neither OPENAI_API_KEY nor GEMINI_API_KEY is set. Embedding generation will fail.');
 }
 
 if (!groqApiKey) {
   console.warn('Warning: GROQ_API_KEY is not set. Chat and summary features will fail.');
 }
 
+let openaiClient: OpenAI | null = null;
 let geminiClient: GoogleGenerativeAI | null = null;
 let groqClient: OpenAI | null = null;
 
@@ -31,6 +34,18 @@ function getErrorMessage(e: unknown): string {
     if (typeof maybe.message === 'string') return maybe.message;
   }
   return String(e);
+}
+
+function getOpenAIClient() {
+  if (!openaiApiKey) {
+    throw new Error('OPENAI_API_KEY is not set. Add it to .env.local to generate embeddings.');
+  }
+
+  openaiClient ??= new OpenAI({
+    apiKey: openaiApiKey,
+  });
+
+  return openaiClient;
 }
 
 function getGeminiClient() {
@@ -61,8 +76,9 @@ const GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
+    // Use Gemini for embeddings (works with 768 dimensions in DB)
     const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: EMBEDDING_MODEL });
+    const model = client.getGenerativeModel({ model: 'models/text-embedding-004' });
     
     const result = await model.embedContent(text.replace(/\n/g, ' '));
 

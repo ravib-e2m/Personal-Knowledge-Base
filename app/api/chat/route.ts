@@ -56,27 +56,33 @@ export async function POST(req: Request) {
       content: message,
     });
 
-    // 4. Execute hybrid search
-    const queryEmbedding = await generateEmbedding(message);
-    const { data: retrievedChunks, error: searchErr } = await supabase.rpc('hybrid_search_chunks', {
-      p_user_id: userUuid,
-      p_query: message,
-      p_embedding: queryEmbedding,
-      p_match_count: 8,
-      p_collection_id: collectionId && collectionId !== 'all' ? collectionId : null,
-    });
+    // 3.5. Check if this is a greeting BEFORE expensive operations
+    const greetingPatterns = /^(hi|hello|hey|greetings|what's up|whats up|yo|howdy|good morning|good afternoon|good evening|hiya|wassup|sup|hey there|hello there|hii|hlo|hola|namaste|thanks|thank you|bye|goodbye|see you)/i;
+    const isGreeting = greetingPatterns.test(message.trim()) || message.trim().length < 15;
 
-    if (searchErr) {
-      console.error('RAG Retrieval search error:', searchErr);
+    let contextText = '';
+    let referencedChunks: any[] = [];
+
+    // 4. Execute hybrid search ONLY if NOT a greeting (skip expensive operations)
+    if (!isGreeting) {
+      const queryEmbedding = await generateEmbedding(message);
+      const { data: retrievedChunks, error: searchErr } = await supabase.rpc('hybrid_search_chunks', {
+        p_user_id: userUuid,
+        p_query: message,
+        p_embedding: queryEmbedding,
+        p_match_count: 8,
+        p_collection_id: collectionId && collectionId !== 'all' ? collectionId : null,
+      });
+
+      if (searchErr) {
+        console.error('RAG Retrieval search error:', searchErr);
+      }
+
+      // 5. Assemble Context
+      const assembled = assembleContext(retrievedChunks || [], { tokenBudget: 4000 });
+      contextText = assembled.contextText;
+      referencedChunks = assembled.referencedChunks;
     }
-
-    // 5. Assemble Context
-    const { contextText, referencedChunks } = assembleContext(retrievedChunks || [], { tokenBudget: 4000 });
-
-    // Check if this is a greeting - make it more flexible
-    const greetingPatterns = /^(hi|hello|hey|greetings|what's up|yo|howdy|good morning|good afternoon|good evening|hiya|wassup|sup|hey there|hello there)/i;
-    const isGreeting = greetingPatterns.test(message.trim());
-    const hasContext = contextText && contextText.trim().length > 50;
 
     // 6. Build Chat Completion Messages
     let systemPrompt = '';
@@ -152,6 +158,19 @@ ${contextText || 'No context available.'}
 
     if (saveMsgErr) {
       console.error('Failed to save assistant message:', saveMsgErr);
+      // Return response with the assistant content even if DB save fails
+      return NextResponse.json({
+        chatId: targetChatId,
+        message: {
+          id: 'temp-' + Date.now(),
+          chat_id: targetChatId,
+          user_id: userUuid,
+          role: 'assistant',
+          content: assistantContent,
+          citations,
+          created_at: new Date().toISOString(),
+        },
+      });
     }
 
     return NextResponse.json({

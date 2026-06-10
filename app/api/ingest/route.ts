@@ -166,17 +166,24 @@ export async function POST(req: Request) {
 
       // Extract plain text from PDF
       try {
+        console.log(`Starting PDF text extraction for file: ${file.name}, size: ${fileSize} bytes`);
         text = await extractTextFromPDF(buffer);
         if (!text || !text.trim()) {
+          console.error('PDF extraction returned empty text');
           return NextResponse.json(
             { error: 'PDF file is empty or contains no extractable text. Please ensure the PDF has readable text content.' },
             { status: 422 }
           );
         }
+        console.log(`Successfully extracted ${text.length} characters from PDF`);
       } catch (pdfErr) {
         console.error('PDF extraction failed:', pdfErr);
+        const errorMessage = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
         return NextResponse.json(
-          { error: `Failed to extract text from PDF: ${getErrorMessage(pdfErr)}` },
+          { 
+            error: `Failed to extract text from PDF: ${errorMessage}`,
+            details: 'If this is a scanned PDF, it may require OCR processing. If the file is protected, please remove the password first.'
+          },
           { status: 422 }
         );
       }
