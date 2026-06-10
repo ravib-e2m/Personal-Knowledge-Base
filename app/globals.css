@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #050505;
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+@keyframes pixelDrift {
+  from {
+    background-position: 0 0, 0 0, 10px 10px;
+  }
+  to {
+    background-position: 48px 32px, -32px 48px, 58px 42px;
+  }
+}
+
+.pixel-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.16) 1px, transparent 1.5px),
+    radial-gradient(circle at 10px 8px, rgba(0, 0, 0, 0.08) 1px, transparent 1.5px),
+    #ffffff;
+  background-size: 22px 22px, 38px 38px, auto;
+  animation: pixelDrift 14s linear infinite;
+  color: #050505;
+}
+
+.pixel-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.pixel-shell .pixel-panel,
+.pixel-shell aside,
+.pixel-shell header,
+.pixel-shell form,
+.pixel-shell label,
+.pixel-shell select,
+.pixel-shell input,
+.pixel-shell textarea {
+  background-color: rgba(255, 255, 255, 0.86) !important;
+  color: #050505 !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  box-shadow: none !important;
+}
+
+.pixel-shell aside,
+.pixel-shell header {
+  backdrop-filter: blur(10px);
+}
+
+.pixel-shell [class*="bg-zinc"],
+.pixel-shell [class*="bg-[#"],
+.pixel-shell [class*="bg-indigo"],
+.pixel-shell [class*="bg-purple"],
+.pixel-shell [class*="bg-pink"],
+.pixel-shell [class*="bg-emerald"],
+.pixel-shell [class*="bg-blue"],
+.pixel-shell [class*="bg-red"] {
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+.pixel-shell [class*="bg-gradient"],
+.pixel-shell [class*="from-"],
+.pixel-shell [class*="via-"],
+.pixel-shell [class*="to-"] {
+  background-image: none !important;
+}
+
+.pixel-shell .text-transparent {
+  color: #050505 !important;
+  -webkit-text-fill-color: #050505;
+}
+
+.pixel-shell [class*="text-white"],
+.pixel-shell [class*="text-zinc"],
+.pixel-shell [class*="text-indigo"],
+.pixel-shell [class*="text-purple"],
+.pixel-shell [class*="text-pink"],
+.pixel-shell [class*="text-emerald"],
+.pixel-shell [class*="text-blue"],
+.pixel-shell [class*="text-red"] {
+  color: #050505 !important;
+}
+
+.pixel-shell [class*="border-zinc"],
+.pixel-shell [class*="border-indigo"],
+.pixel-shell [class*="border-purple"],
+.pixel-shell [class*="border-pink"],
+.pixel-shell [class*="border-emerald"],
+.pixel-shell [class*="border-blue"],
+.pixel-shell [class*="border-red"] {
+  border-color: rgba(0, 0, 0, 0.18) !important;
+}
+
+.pixel-shell button,
+.pixel-shell a,
+.pixel-shell select,
+.pixel-shell input,
+.pixel-shell textarea {
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.pixel-shell button:hover,
+.pixel-shell a:hover {
+  transform: translateY(-1px);
+}
+
+.pixel-shell nav button {
+  border: 1px solid transparent;
+}
+
+.pixel-shell nav button[class*="bg-zinc"] {
+  background: #050505 !important;
+  border-color: #050505 !important;
+  color: #ffffff !important;
+}
+
+.pixel-shell nav button[class*="bg-zinc"] svg {
+  color: #ffffff !important;
+}
+
+.pixel-logo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  color: #050505;
+  background: #ffffff !important;
+  border: 2px solid #050505;
+  border-radius: 0;
+  box-shadow:
+    4px 4px 0 #050505,
+    inset 0 0 0 4px #ffffff;
+}
+
+.pixel-logo::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  background: #050505;
+  box-shadow:
+    -8px 0 0 #050505,
+    0 -8px 0 #050505,
+    -12px -12px 0 #050505;
+}
+
+/* Custom fade-in animations for a fluid SPA feel */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #050505;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2f2f2f;
+}
