@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     'pdfjs-dist',
     'canvas',
     '@napi-rs/canvas',
+    'playwright',
+    'playwright-core',
   ],
 
   // Turbopack config
