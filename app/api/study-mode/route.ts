@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 import { generateStudyMaterial } from '@/lib/openai';
 
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const documentId = searchParams.get('documentId');

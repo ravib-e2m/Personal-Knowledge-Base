@@ -1,105 +1,55 @@
-/**
- * Extract text from PDF using pdfjs-dist with CDN worker.
- */
+// IMPORTANT: import the internal implementation directly.
+// The package entry point (`pdf-parse`) contains debug code that tries to read
+// a local test PDF file (./test/data/05-versions-space.pdf) whenever
+// `module.parent` is falsy. Under Next.js / Turbopack server bundling this
+// triggers an ENOENT crash on import. Importing the lib file directly skips
+// that debug block entirely.
+
+type PdfParseFn = (
+  dataBuffer: Buffer,
+  options?: Record<string, unknown>
+) => Promise<{ text: string; numpages: number; info: unknown }>;
+
+let pdfParsePromise: Promise<PdfParseFn> | null = null;
+
+async function getPdfParse(): Promise<PdfParseFn> {
+  pdfParsePromise ??= import('pdf-parse/lib/pdf-parse.js').then(
+    (mod) => (mod.default ?? mod) as PdfParseFn
+  );
+  return pdfParsePromise;
+}
 
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    console.log(`📄 Starting PDF extraction...`);
-    
-    // Dynamic import of pdfjs-dist
-    const pdfjsLib = await import('pdfjs-dist');
-    
-    // CRITICAL FIX: Use the correct worker path for pdfjs-dist v6
-    // The worker needs to be from the same package build
-    if (typeof window === 'undefined') {
-      // Server-side: Use the local worker from node_modules
-      pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/build/pdf.worker.mjs');
-    } else {
-      // Client-side fallback (shouldn't hit this in API routes)
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
-    }
-    
-    // Load the PDF document with better error handling
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      useSystemFonts: true,
-      standardFontDataUrl: undefined,
-      verbosity: 0, // Reduce console noise
-    });
+    console.log(`📄 Starting PDF extraction using pdf-parse (internal lib)...`);
 
-    const pdfDocument = await loadingTask.promise;
-    const numPages = pdfDocument.numPages;
-    
-    console.log(`📄 Processing PDF with ${numPages} pages...`);
-    
-    if (numPages === 0) {
-      throw new Error('PDF has 0 pages. The file may be corrupted or invalid.');
-    }
-    
-    // Extract text from all pages
-    const textPages: string[] = [];
-    let successfulPages = 0;
-    let failedPages = 0;
-    
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      try {
-        const page = await pdfDocument.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        // Extract and join text items
-        const pageText = textContent.items
-          .map((item: any) => {
-            if (typeof item === 'string') return item;
-            if (item && typeof item === 'object' && 'str' in item) {
-              return item.str;
-            }
-            return '';
-          })
-          .filter((text: string) => text.length > 0)
-          .join(' ');
-        
-        if (pageText.trim()) {
-          textPages.push(pageText.trim());
-          successfulPages++;
-        }
-      } catch (pageError) {
-        failedPages++;
-        console.warn(`⚠️  Failed to extract text from page ${pageNum}:`, pageError);
-        // Continue with other pages
-      }
-    }
-    
-    console.log(`📊 Extraction stats: ${successfulPages}/${numPages} pages successful, ${failedPages} failed`);
-
-    // Combine all pages
-    const fullText = textPages.join('\n\n').trim();
-
-    if (!fullText || fullText.length === 0) {
-      if (successfulPages === 0) {
-        throw new Error('Could not extract any text from the PDF. The PDF might be scanned images (requires OCR), corrupted, or password protected.');
-      } else {
-        throw new Error(`Extracted text from ${successfulPages} pages but all pages appear to be empty. The PDF might contain only images or non-text content.`);
-      }
+    if (!buffer || buffer.length === 0) {
+      throw new Error('PDF buffer is empty or undefined.');
     }
 
-    console.log(`✅ Successfully extracted ${fullText.length} characters from ${successfulPages} pages`);
+    const pdf = await getPdfParse();
+    const result = await pdf(buffer);
+    const fullText = (result.text || '').trim();
+
+    if (!fullText) {
+      throw new Error(
+        'Could not extract any text from the PDF. The PDF might be scanned images (requires OCR), corrupted, or password protected.'
+      );
+    }
+
+    console.log(`✅ Successfully extracted ${fullText.length} characters`);
     return fullText;
-    
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('❌ PDF extraction error:', message);
-    
-    // Provide more specific error messages
+
     if (message.includes('Invalid PDF structure') || message.includes('PDF header')) {
       throw new Error('Invalid PDF file structure. The file may be corrupted or not a valid PDF.');
     }
     if (message.includes('password') || message.includes('encrypted')) {
       throw new Error('This PDF is password protected or encrypted. Please provide an unprotected version.');
     }
-    if (message.includes('worker')) {
-      throw new Error('PDF worker initialization failed. This is a server configuration issue.');
-    }
-    
+
     throw new Error(`Failed to extract text from PDF: ${message}`);
   }
 }

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
     const supabase = getServiceRoleSupabaseClient();
     const { data: collections, error } = await supabase
       .from('collections')
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { name, description } = await req.json();
     if (!name) {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { id, name, description } = await req.json();
     if (!id || !name) {
@@ -86,7 +86,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

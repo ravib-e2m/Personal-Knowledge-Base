@@ -1,40 +1,93 @@
 import { getServiceRoleSupabaseClient } from './supabase';
+import { getServerSupabaseClient } from './supabase-server';
 
-const DEFAULT_USER_EMAIL = 'local@secondbrain.app';
-const DEFAULT_USER_DISPLAY_NAME = 'Local User';
-const DEFAULT_USER_CLERK_ID = 'local-default-user';
+/**
+ * Thrown when there is no authenticated Supabase session on the request.
+ * API routes translate this into a 401 response.
+ */
+export class UnauthorizedError extends Error {
+  constructor(message = 'Not authenticated') {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
 
-export async function getDefaultUserUuid() {
-  const supabase = getServiceRoleSupabaseClient();
+/**
+ * Resolves the application-level user UUID (the `users.id` primary key) for the
+ * currently authenticated Supabase Auth user.
+ *
+ * On first login the Supabase Auth user is synced into the local `users` table.
+ * The `users.clerk_id` column is reused to store the Supabase Auth user id
+ * (`auth.users.id`) so we don't need a schema migration.
+ *
+ * Every API route calls this, which guarantees per-user data isolation: a user
+ * can only ever see rows whose `user_id` matches their own resolved UUID.
+ */
+export async function getCurrentUserUuid(): Promise<string> {
+  const supabaseAuth = await getServerSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabaseAuth.auth.getUser();
 
-  const { data: existingUser, error: selectError } = await supabase
+  if (error || !user) {
+    throw new UnauthorizedError();
+  }
+
+  const authUserId = user.id;
+  const email = user.email || `${authUserId}@users.noauth`;
+  const displayName =
+    (user.user_metadata?.full_name as string) ||
+    (user.user_metadata?.name as string) ||
+    email.split('@')[0];
+  const avatarUrl =
+    (user.user_metadata?.avatar_url as string) ||
+    (user.user_metadata?.picture as string) ||
+    '';
+
+  // Use the service-role client to upsert/lookup the profile row (bypasses RLS).
+  const admin = getServiceRoleSupabaseClient();
+
+  const { data: existing, error: selectError } = await admin
     .from('users')
     .select('id')
-    .eq('email', DEFAULT_USER_EMAIL)
+    .eq('clerk_id', authUserId)
     .maybeSingle();
 
   if (selectError) {
-    throw new Error(`Unable to lookup default user: ${selectError.message}`);
+    throw new Error(`Unable to lookup user profile: ${selectError.message}`);
   }
 
-  if (existingUser?.id) {
-    return existingUser.id;
+  if (existing?.id) {
+    return existing.id;
   }
 
-  const { data: newUser, error: insertError } = await supabase
+  const { data: created, error: insertError } = await admin
     .from('users')
     .insert({
-      clerk_id: DEFAULT_USER_CLERK_ID,
-      email: DEFAULT_USER_EMAIL,
-      display_name: DEFAULT_USER_DISPLAY_NAME,
-      avatar_url: '',
+      clerk_id: authUserId,
+      email,
+      display_name: displayName,
+      avatar_url: avatarUrl,
     })
     .select('id')
     .single();
 
-  if (insertError || !newUser) {
-    throw new Error(`Unable to create default user: ${insertError?.message ?? 'Unknown error'}`);
+  if (insertError || !created) {
+    throw new Error(`Unable to create user profile: ${insertError?.message ?? 'Unknown error'}`);
   }
 
-  return newUser.id;
+  return created.id;
+}
+
+/**
+ * Maps a thrown error to an appropriate HTTP status + message body.
+ * Returns 401 for auth failures, 500 otherwise.
+ */
+export function authErrorResponse(err: unknown): { status: number; body: { error: string } } {
+  if (err instanceof UnauthorizedError) {
+    return { status: 401, body: { error: 'Not authenticated. Please sign in.' } };
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return { status: 500, body: { error: message } };
 }

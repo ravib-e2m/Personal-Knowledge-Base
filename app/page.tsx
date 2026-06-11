@@ -33,7 +33,7 @@ export default function Home() {
         <div className="text-center z-10 space-y-6 max-w-3xl">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-indigo-400 text-xs font-semibold tracking-wider uppercase shadow-inner">
             <Sparkles className="w-3.5 h-3.5" />
-            Empowered by Advanced AI & Hybrid RAG
+            Empowered by Advanced AI &amp; Hybrid RAG
           </div>
           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight text-white leading-[1.15]">
             Recall Everything.<br />
@@ -62,7 +62,7 @@ export default function Home() {
         </div>
 
         {/* Feature Cards Grid */}
-        <section className="mt-32 w-full grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+        <section className="mt-24 w-full grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
           <div className="p-8 rounded-3xl bg-zinc-900/40 border border-zinc-800/80 backdrop-blur-sm flex flex-col gap-4 group hover:border-zinc-700/80 hover:bg-zinc-900/60 transition-all">
             <div className="p-3 w-fit rounded-2xl bg-indigo-500/10 text-indigo-400">
               <Zap className="w-6 h-6" />

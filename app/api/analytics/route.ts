@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
     const supabase = getServiceRoleSupabaseClient();
 
     // 1. Get documents count & storage size

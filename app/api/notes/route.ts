@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 import { chunkText } from '@/lib/chunking';
 import { generateEmbedding } from '@/lib/openai';
 
 // GET notes
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const collectionId = searchParams.get('collectionId');
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 // POST new note + embed
 export async function POST(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { title, content, collectionId } = await req.json();
     if (!title || !content) {
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
 // PUT / DELETE note
 export async function PUT(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { id, title, content, collectionId } = await req.json();
     if (!id || !title || !content) {
@@ -170,7 +170,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

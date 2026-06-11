@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid, authErrorResponse } from '@/lib/auth';
 import { generateEmbedding, assembleContext, getGroqClient } from '@/lib/openai';
 
 export const maxDuration = 60; // Max execution timeout for Groq calls
 
 export async function POST(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { message, chatId, collectionId } = await req.json();
     if (!message || !message.trim()) {
@@ -56,9 +56,13 @@ export async function POST(req: Request) {
       content: message,
     });
 
-    // 3.5. Check if this is a greeting BEFORE expensive operations
-    const greetingPatterns = /^(hi|hello|hey|greetings|what's up|whats up|yo|howdy|good morning|good afternoon|good evening|hiya|wassup|sup|hey there|hello there|hii|hlo|hola|namaste|thanks|thank you|bye|goodbye|see you)/i;
-    const isGreeting = greetingPatterns.test(message.trim()) || message.trim().length < 15;
+    // 3.5. Check if this is a pure greeting/pleasantry BEFORE expensive operations.
+    // Only treat the message as a greeting when the WHOLE message is a greeting
+    // (e.g. "hi", "hello there", "thanks!"). Short questions like "what is X?"
+    // must still trigger retrieval so the assistant can use ingested knowledge.
+    const trimmedMessage = message.trim();
+    const greetingOnlyPattern = /^(hi+|hello+|hey+|greetings|what'?s up|yo|howdy|good (morning|afternoon|evening|night)|hiya|wassup|sup|hey there|hello there|hii+|hlo|hola|namaste|thanks(\s+you)?|thank you|thx|ty|bye|goodbye|see you|cya)[\s!.,]*$/i;
+    const isGreeting = greetingOnlyPattern.test(trimmedMessage);
 
     let contextText = '';
     let referencedChunks: any[] = [];
@@ -179,6 +183,7 @@ ${contextText || 'No context available.'}
     });
   } catch (err) {
     console.error('Chat endpoint failure:', err);
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    const { status, body } = authErrorResponse(err);
+    return NextResponse.json(body, { status });
   }
 }

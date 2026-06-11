@@ -8,6 +8,7 @@ import {
   HelpCircle, Eye, RefreshCw, Send, X, ArrowUpRight, Copy, Check, FileUp, Layers
 } from 'lucide-react';
 import { PureMultimodalInput } from '@/components/ui/multimodal-ai-chat-input';
+import { getBrowserSupabaseClient } from '@/lib/supabase-browser';
 
 // Definitions matching components
 interface Attachment {
@@ -30,16 +31,29 @@ export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const router = useRouter();
+  const supabase = getBrowserSupabaseClient();
 
   useEffect(() => {
-    const storedEmail = typeof window !== 'undefined' ? window.localStorage.getItem('pkb_user_email') : null;
-    if (!storedEmail) {
-      router.push('/sign-in');
-      return;
-    }
-    setUserEmail(storedEmail);
-    setSignedIn(true);
-  }, [router]);
+    let active = true;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!active) return;
+      if (!user) {
+        router.push('/sign-in');
+        return;
+      }
+      setUserEmail(user.email ?? null);
+      setSignedIn(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [router, supabase]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/sign-in');
+    router.refresh();
+  };
   
   // App States
   const [collections, setCollections] = useState<any[]>([]);
@@ -1507,7 +1521,7 @@ export default function Dashboard() {
               </div>
               <div className="p-3 bg-zinc-950/20 border border-zinc-900 rounded-xl space-y-1">
                 <span className="text-zinc-500">Embedding Model</span>
-                <p className="font-bold text-indigo-400 text-sm">text-embedding-3-small (1536)</p>
+                <p className="font-bold text-indigo-400 text-sm">gemini-embedding-001 (768)</p>
               </div>
               <div className="p-3 bg-zinc-950/20 border border-zinc-900 rounded-xl space-y-1">
                 <span className="text-zinc-500">Chat & Reasoning Engine</span>
@@ -1608,9 +1622,16 @@ export default function Dashboard() {
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-zinc-300 leading-none">{userEmail || 'Local User'}</span>
-              <span className="text-[10px] text-zinc-500 font-mono mt-1">Local Workspace</span>
+              <span className="text-[10px] text-zinc-500 font-mono mt-1">Signed in</span>
             </div>
           </div>
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </aside>
 
@@ -1643,6 +1664,13 @@ export default function Dashboard() {
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-900 text-xs font-bold text-white">
               {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
             </div>
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </header>
 

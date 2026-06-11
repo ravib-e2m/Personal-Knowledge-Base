@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid, authErrorResponse } from '@/lib/auth';
 import { extractTextFromPDF } from '@/lib/pdf';
 import { scrapeUrl } from '@/lib/scraper';
 import { extractWebContent } from '@/lib/browser-use';
@@ -78,7 +78,7 @@ export const maxDuration = 60; // Max execution timeout for Vercel/Netlify serve
 
 export async function POST(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
     const supabase = getServiceRoleSupabaseClient();
 
     const contentType = req.headers.get('content-type') || '';
@@ -288,35 +288,43 @@ export async function POST(req: Request) {
     // 3. Chunk text
     const chunks = chunkText(text, { chunkSize: 1000, chunkOverlap: 200 });
 
-    // 4. Generate embeddings per chunk; if embedding fails (quota), mark chunk as pending embedding and continue
+    // 4. Generate embeddings per chunk in parallel batches for speed.
+    // If embedding fails (quota), mark chunk as pending embedding and continue.
     const chunkInserts: ChunkInsertData[] = [];
     let embeddingFailures = 0;
+    const EMBED_CONCURRENCY = 10;
 
-    for (const chunk of chunks) {
-      let embedding: number[] | null = null;
-      let pending_embedding = false;
-      try {
-        embedding = await generateEmbedding(chunk.content);
-      } catch (embErr) {
-        embeddingFailures += 1;
-        pending_embedding = true;
-        console.warn('Embedding generation failed for a chunk, marking as pending:', embErr);
+    for (let i = 0; i < chunks.length; i += EMBED_CONCURRENCY) {
+      const batch = chunks.slice(i, i + EMBED_CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (chunk) => {
+          try {
+            const embedding = await generateEmbedding(chunk.content);
+            return { chunk, embedding, pending_embedding: false };
+          } catch (embErr) {
+            embeddingFailures += 1;
+            console.warn('Embedding generation failed for a chunk, marking as pending:', embErr);
+            return { chunk, embedding: null as number[] | null, pending_embedding: true };
+          }
+        })
+      );
+
+      for (const { chunk, embedding, pending_embedding } of results) {
+        chunkInserts.push({
+          user_id: userUuid,
+          document_id: document.id,
+          content: chunk.content,
+          embedding,
+          metadata: {
+            source_name: docName,
+            headings: chunk.metadata.headings,
+            section_path: chunk.metadata.sectionPath,
+            source_type: sourceType,
+            storage_path: storagePath,
+            pending_embedding,
+          },
+        });
       }
-
-      chunkInserts.push({
-        user_id: userUuid,
-        document_id: document.id,
-        content: chunk.content,
-        embedding: embedding,
-        metadata: {
-          source_name: docName,
-          headings: chunk.metadata.headings,
-          section_path: chunk.metadata.sectionPath,
-          source_type: sourceType,
-          storage_path: storagePath,
-          pending_embedding,
-        },
-      });
     }
 
     // Insert chunks in batch of 50; if DB insertion fails, rollback document and storage
@@ -369,6 +377,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Ingestion pipeline general failure:', error);
-    return NextResponse.json({ error: `Internal Server Error: ${(error as Error).message}` }, { status: 500 });
+    const { status, body } = authErrorResponse(error);
+    return NextResponse.json(body, { status });
   }
 }

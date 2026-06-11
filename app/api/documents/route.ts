@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 
 // GET all documents OR get a signed URL for a specific document
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const docId = searchParams.get('id');
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
 // DELETE a document
 export async function DELETE(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

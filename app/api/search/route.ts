@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getServiceRoleSupabaseClient } from '@/lib/supabase';
-import { getDefaultUserUuid } from '@/lib/auth';
+import { getCurrentUserUuid } from '@/lib/auth';
 import { generateEmbedding } from '@/lib/openai';
 
 // GET search results OR search history
 export async function GET(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get('mode') || 'search'; // 'search' or 'history'
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
 // DELETE recent search
 export async function DELETE(req: Request) {
   try {
-    const userUuid = await getDefaultUserUuid();
+    const userUuid = await getCurrentUserUuid();
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

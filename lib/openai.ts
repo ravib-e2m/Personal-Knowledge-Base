@@ -4,8 +4,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const openaiApiKey = process.env.OPENAI_API_KEY || '';
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 const groqApiKey = process.env.GROQ_API_KEY || '';
-// Use Gemini's text-embedding-004 model with 768 dimensions
-const EMBEDDING_MODEL = 'text-embedding-004'; // Gemini model
+// Use Gemini's gemini-embedding-001 model. The output dimensionality MUST match
+// the `embedding vector(...)` column in the Supabase `chunks` table. The live
+// database uses 768 dimensions, so we request 768 here. Both ingestion and query
+// embeddings use this same value to keep vector search consistent.
+const EMBEDDING_MODEL = 'gemini-embedding-001';
 const EMBEDDING_DIMENSIONS = 768;
 
 if (!openaiApiKey && !geminiApiKey) {
@@ -76,15 +79,22 @@ const GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
 
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    // Use Gemini for embeddings (works with 768 dimensions in DB)
+    // Use Gemini for embeddings (1536 dimensions to match DB vector(1536) column)
     const client = getGeminiClient();
-    const model = client.getGenerativeModel({ model: 'models/text-embedding-004' });
+    const model = client.getGenerativeModel({ model: EMBEDDING_MODEL });
     
-    const result = await model.embedContent(text.replace(/\n/g, ' '));
+    const result = await model.embedContent({
+      content: { role: 'user', parts: [{ text: text.replace(/\n/g, ' ') }] },
+      outputDimensionality: EMBEDDING_DIMENSIONS,
+    } as any);
 
     const embedding = result.embedding?.values;
     if (!Array.isArray(embedding) || embedding.length === 0) {
       throw new Error('Invalid embedding response from Gemini');
+    }
+
+    if (embedding.length !== EMBEDDING_DIMENSIONS) {
+      console.warn(`Expected ${EMBEDDING_DIMENSIONS} dimensions, got ${embedding.length}`);
     }
 
     return embedding;
